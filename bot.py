@@ -74,6 +74,21 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def recognize_dish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    MODEL_PATH = 'best.pt' 
+
+    if not os.path.exists(MODEL_PATH):
+        logger.warning("MODEL 'best.pt' NOT FOUND. RUNNING IN PLACEHOLDER MODE.")
+        await update.message.reply_text("⚠️ Внимание: Режим заглушки ⚠️\n\nОсновная AI-модель еще не обучена. Возвращаю тестовый результат.")
+        await asyncio.sleep(2) 
+        await update.message.reply_html(
+            "<b>Тестовый Результат:</b>\n\n"
+            "<b>Пицца 'Маргарита'</b> (99%)\n"
+            "🔥 Калории: 250 ккал/100г\n"
+            "👍 Оценка: Умеренно\n"
+            "📝 Рецепт: Классический рецепт на тонком тесте."
+        )
+        return
+
     logger.info(f"User {update.effective_user.name} sent a photo for recognition.")
     await update.message.reply_text("Анализирую фото... Это может занять некоторое время.")
     photo_file = await update.message.photo[-1].get_file()
@@ -89,25 +104,17 @@ async def recognize_dish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             dish = await get_dish_by_name(item['name'])
             if dish:
                 response_parts.append(
-                    f"<b>{dish.name_ru}</b> ({item['confidence']:.0%})
-"
-                    f"🔥 Калории: {dish.calories or 'н/д'} ккал/100г
-"
-                    f"👍 Оценка: {dish.health_impact or 'н/д'}
-"
+                    f"<b>{dish.name_ru}</b> ({item['confidence']:.0%})\n"
+                    f"🔥 Калории: {dish.calories or 'н/д'} ккал/100г\n"
+                    f"👍 Оценка: {dish.health_impact or 'н/д'}\n"
                     f"📝 Рецепт: {dish.recipe or 'н/д'}"
                 )
             else:
                 response_parts.append(
-                    f"✔️ Распознано: <b>{item['name']}</b> ({item['confidence']:.0%})
-"
+                    f"✔️ Распознано: <b>{item['name']}</b> ({item['confidence']:.0%})\n"
                     f"<i>(Информация еще не добавлена в базу.)</i>"
                 )
-        await update.message.reply_html(f"<b>Результаты анализа:</b>
-
-" + "
-
-".join(response_parts))
+        await update.message.reply_html(f"<b>Результаты анализа:</b>\n\n" + "\n\n".join(response_parts))
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
