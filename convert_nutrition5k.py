@@ -6,16 +6,21 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 import yaml
+from shutil import copyfile
 
 # --- CONFIGURATION ---
 # IMPORTANT: Update this path to where you have downloaded the Nutrition5k dataset
 NUTRITION5K_PATH = Path("path/to/your/nutrition5k_dataset") 
 
+# How many images to process for a test run. 
+# Set to None to process the entire dataset.
+LIMIT = 200 
+
 # Path to the metadata folder within the dataset
 METADATA_PATH = NUTRITION5K_PATH / "metadata"
 
 # Where to save the converted YOLO dataset
-OUTPUT_PATH = Path("./dataset")
+OUTPUT_PATH = Path("./dataset_yolo")
 
 def get_bounding_box_from_mask(mask_path: Path) -> list:
     """Calculates the bounding box from a segmentation mask image."""
@@ -54,11 +59,19 @@ def process_dataset():
     Main function to convert the Nutrition5k dataset to YOLO format.
     """
     if not NUTRITION5K_PATH.exists() or NUTRITION5K_PATH == Path("path/to/your/nutrition5k_dataset"):
-        print(f"ERROR: Dataset path not configured. Please update 'NUTRITION5K_PATH' in this script.")
-        print(f"Current path is: {NUTRITION5K_PATH}")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(f"ERROR: Dataset path is not configured correctly.")
+        print(f"Please open this script ('convert_nutrition5k.py') and update the")
+        print(f"'NUTRITION5K_PATH' variable to the correct location.")
+        print(f"Current incorrect path is: {NUTRITION5K_PATH}")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         return
 
     print("--- Starting Nutrition5k to YOLO conversion ---")
+    if LIMIT is not None:
+        print(f"---!!! WARNING: Running in TEST MODE. Will process only {LIMIT} images. !!!---")
+        print(f"---!!! To process the full dataset, set LIMIT = None in the script. !!!---")
+
 
     # 1. Load dish metadata and create class mapping
     dishes_df = pd.read_csv(METADATA_PATH / "dishes.csv")
@@ -67,6 +80,7 @@ def process_dataset():
     print(f"Found {len(class_names)} classes.")
 
     # 2. Create output directories
+    print(f"Will create YOLO dataset at: {OUTPUT_PATH.resolve()}")
     yolo_images_train = OUTPUT_PATH / "images" / "train"
     yolo_labels_train = OUTPUT_PATH / "labels" / "train"
     yolo_images_valid = OUTPUT_PATH / "images" / "valid"
@@ -82,58 +96,52 @@ def process_dataset():
     with open(dish_metadata_path, 'r') as f:
         all_dishes_meta = json.load(f)
 
+    # Apply the limit if it's set
+    if LIMIT is not None:
+        all_dishes_meta = all_dishes_meta[:LIMIT]
+
     print(f"Processing {len(all_dishes_meta)} total dish entries...")
     
     for dish_meta in tqdm(all_dishes_meta, desc="Converting dishes"):
         dish_id = dish_meta['dish_id']
         dish_name = dish_meta['dish_name']
         
-        # Get the correct class ID for this dish
         if dish_name not in class_to_id:
-            continue # Skip if dish name not in our classes list
+            continue 
         class_id = class_to_id[dish_name]
 
-        # Define paths for this specific dish's images
         original_img_path = NUTRITION5K_PATH / "imagery" / "realsense_overhead" / dish_id / "rgb.png"
         mask_path = NUTRITION5K_PATH / "imagery" / "realsense_overhead" / dish_id / "segmentation.png"
 
         if not original_img_path.exists():
             continue
 
-        # Get bounding box from the segmentation mask
         box = get_bounding_box_from_mask(mask_path)
         if not box:
             continue
             
-        # Get image dimensions
         with Image.open(original_img_path) as img:
             img_width, img_height = img.size
 
-        # Convert bounding box to YOLO format
         yolo_box = convert_to_yolo_format(box, img_width, img_height)
 
-        # Decide whether to put in train or validation set (e.g., 80/20 split)
-        # A simple split based on hash, can be improved
         is_train = (hash(dish_id) % 10) < 8 
         
         yolo_img_dir = yolo_images_train if is_train else yolo_images_valid
         yolo_label_dir = yolo_labels_train if is_train else yolo_labels_valid
 
-        # Copy original image to YOLO dataset folder
-        # For efficiency, we could use symlinks, but copy is more portable.
-        from shutil import copyfile
         copyfile(original_img_path, yolo_img_dir / f"{dish_id}.png")
 
-        # Write YOLO label file
         label_path = yolo_label_dir / f"{dish_id}.txt"
         with open(label_path, 'w') as f:
-            f.write(f"{class_id} {' '.join(map(str, yolo_box))}
-")
+            f.write(f"{class_id} {' '.join(map(str, yolo_box))}\n")
     
     # 4. Create data.yaml file
+    print("Creating data.yaml file...")
     data_yaml = {
-        'train': str(yolo_images_train.resolve()),
-        'val': str(yolo_images_valid.resolve()),
+        'path': str(OUTPUT_PATH.resolve()),
+        'train': str((OUTPUT_PATH / "images" / "train").resolve()),
+        'val': str((OUTPUT_PATH / "images" / "valid").resolve()),
         'nc': len(class_names),
         'names': class_names
     }
@@ -142,13 +150,11 @@ def process_dataset():
     with open(yaml_path, 'w') as f:
         yaml.dump(data_yaml, f, sort_keys=False)
 
-    print("
---- Conversion Complete! ---")
-    print(f"YOLO dataset created at: {OUTPUT_PATH}")
-    print(f"YAML configuration file created at: {yaml_path}")
-    print("
-Next steps:")
-    print(f"1. Update 'dataset_yaml_path' in 'train_yolo.py' to '{yaml_path}'")
+    print("\n--- Conversion Complete! ---")
+    print(f"YOLO dataset created at: {OUTPUT_PATH.resolve()}")
+    print(f"YAML configuration file created at: {yaml_path.resolve()}")
+    print("\nNext steps:")
+    print(f"1. Check that the paths in '{yaml_path.resolve()}' are correct.")
     print("2. Run training: python train_yolo.py")
 
 if __name__ == "__main__":
