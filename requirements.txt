@@ -1,0 +1,30 @@
+# Telegram Bot
+python-telegram-bot==20.7
+python-dotenv==1.0.0
+
+# Database
+aiosqlite==0.20.0
+SQLAlchemy==2.0.23
+greenlet>=1.1.0 # Required by SQLAlchemy for aiosqlite
+# alembic==1.13.1 # For database migrations, can be added later
+# asyncpg==0.29.0 # For PostgreSQL later
+
+# Computer Vision (CV)
+ultralytics==8.0.207
+Pillow
+opencv-python==4.8.1.78
+numpy==1.26.2
+
+# Optical Character Recognition (OCR)
+pytesseract==0.3.10
+easyocr==1.7.1
+
+# Speech-to-Text
+openai-whisper @ git+https://github.com/openai/whisper.git
+
+# Audio Processing
+ffmpeg-python==0.2.0
+
+# Optional for package management
+# uv
+# poetry

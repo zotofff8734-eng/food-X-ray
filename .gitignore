@@ -1,0 +1,19 @@
+# Python virtual environment
+venv/
+
+# Node modules
+node_modules/
+
+# Environment variables
+.env
+
+# Pycache
+__pycache__/
+*.pyc
+
+# IDE files
+.idea/
+.vscode/
+
+# Dataset files - often large and not versioned with code
+dataset/
